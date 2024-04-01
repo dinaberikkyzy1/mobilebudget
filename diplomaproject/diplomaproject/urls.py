@@ -21,5 +21,4 @@ from projectapp.views import *
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("convert/", convert_pdf_to_json),
-
 ]
