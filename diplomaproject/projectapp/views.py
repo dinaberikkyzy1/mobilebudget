@@ -18,28 +18,50 @@ import tabulate
 import os
 import json
 
+from .forms import IncomeForm, ReviewForm, SpendingForm
+
 
 @csrf_exempt
+# def convert_pdf_to_json(request):
+#     if request.method == 'POST':
+#         # Get the uploaded file from the request
+#         pdf_file = request.FILES.get('pdf_file')
+
+#         if pdf_file:
+            
+#             pdf_path = default_storage.save(os.path.join(settings.MEDIA_ROOT, 'test.pdf'),pdf_file)
+
+#             # Extract tables from PDF
+#             tables = extract_tables_from_pdf(pdf_path)
+
+#             # Convert tables to JSON
+#             json_data = convert_tables_to_json(tables)
+
+#             return JsonResponse({'data': json_data})
+
+#     return JsonResponse({'error': 'Invalid request'}, status=400, safe=False)
+
+
 def convert_pdf_to_json(request):
     if request.method == 'POST':
         # Get the uploaded file from the request
         pdf_file = request.FILES.get('pdf_file')
 
         if pdf_file:
-            # Save the PDF file temporarily
-            temp_path = default_storage.save(os.path.join(settings.MEDIA_ROOT, 'temp.pdf'), ContentFile(pdf_file.read()))
+            # Get the path to the permanent file
+            permanent_pdf = os.path.join(settings.MEDIA_ROOT, 'permanent.pdf')
+
+            # Open the permanent file in append mode and write the contents of the uploaded PDF
+            with default_storage.open(permanent_pdf, 'ab') as permanent_file:
+                for chunk in pdf_file.chunks():
+                    permanent_file.write(chunk)
 
             # Extract tables from PDF
-            tables = extract_tables_from_pdf(temp_path)
+            tables = extract_tables_from_pdf(permanent_pdf)
 
             # Convert tables to JSON
             json_data = convert_tables_to_json(tables)
 
-            # Export JSON data to CSV
-            # csv_file_path = os.path.join(settings.MEDIA_ROOT, 'output.csv')
-            # csv_exported_path = export_json_to_csv(json_data, csv_file_path)
-
-            # Return CSV file path
             return JsonResponse({'data': json_data})
 
     return JsonResponse({'error': 'Invalid request'}, status=400, safe=False)
@@ -111,6 +133,45 @@ def convert_tables_to_json(tables):
             json_data.append(json_entry)
     return json_data
 
+@csrf_exempt
+def onboarding_step1(request):
+    if request.method == 'POST':
+        form = IncomeForm(request.POST)
+        if form.is_valid():
+            income = form.save(commit=False)
+            income.user = request.user
+            income.save()
+            return redirect('onboarding_step2')
+    else:
+        form = IncomeForm()
+    return render(request, 'onboarding_step1.html', {'form': form})
+
+def onboarding_step2(request):
+    if request.method == 'POST':
+        form = SpendingForm(request.POST)
+        if form.is_valid():
+            spending = form.save(commit=False)
+            spending.user = request.user
+            spending.save()
+            return redirect('onboarding_step3')
+    else:
+        form = SpendingForm()
+    return render(request, 'onboarding_step2.html', {'form': form})
+
+def onboarding_step3(request):
+    if request.method == 'POST':
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            review = form.save(commit=False)
+            review.user = request.user
+            review.save()
+            return redirect('onboarding_complete')
+    else:
+        form = ReviewForm()
+    return render(request, 'onboarding_step3.html', {'form': form})
+
+def onboarding_complete(request):
+    return render(request, 'onboarding_complete.html')
 
 
 # def convert_tables_to_json(tables):
@@ -157,14 +218,10 @@ def export_to_pdf(request):
         if not json_file:
             return HttpResponse("No JSON file provided", status=400)
         
-        temp_path = default_storage.save(os.path.join(settings.MEDIA_ROOT, 'temp.json'), ContentFile(json_file.read()))
         try:
-            with open(temp_path) as f:
-                json_data = json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
+            json_data = json.load(json_file)
+        except json.JSONDecodeError as e:
             return HttpResponse(f"Error reading JSON file: {e}", status=400)
-        finally:
-            default_storage.delete(temp_path)  # Cleanup temp file
         
         doc = SimpleDocTemplate(response, pagesize=letter)
         header = json_data[0].keys()
@@ -172,10 +229,6 @@ def export_to_pdf(request):
         
         table_data = [header] + rows
         
-    
-        
-    
-
         table = Table(table_data)
         table.setStyle([('BACKGROUND', (0, 0), (-1, 0), colors.gray),
                         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -186,9 +239,8 @@ def export_to_pdf(request):
                         ('GRID', (0, 0), (-1, -1), 1, colors.black)])
         
         doc.build([table])
-        #elements.append(table)
- # Build the PDF with the elements
-
+        
+        # Save the PDF directly to the permanent location
         pdf_file_path = os.path.join(settings.MEDIA_ROOT, 'data.pdf')
         with open(pdf_file_path, 'wb') as pdf_file:
             pdf_file.write(response.content)
