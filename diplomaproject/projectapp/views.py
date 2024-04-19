@@ -61,7 +61,11 @@ def convert_pdf_to_json(request):
 
             # Convert tables to JSON
             json_data = convert_tables_to_json(tables)
-
+            
+            json_file_path = os.path.join(settings.MEDIA_ROOT, 'json_test_data.json')
+            with open(json_file_path, 'w') as json_file:
+                json.dump(json_data, json_file)
+            
             return JsonResponse({'data': json_data})
 
     return JsonResponse({'error': 'Invalid request'}, status=400, safe=False)
