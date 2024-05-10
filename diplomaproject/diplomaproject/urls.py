@@ -15,15 +15,9 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
-from projectapp.views import *
+from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("convert/", convert_pdf_to_json),
-    path('export_pdf/', export_to_pdf, name='export_to_pdf'),
-    path('onboarding/step1/', onboarding_step1, name='onboarding_step1'),
-    path('onboarding/step2/', onboarding_step2, name='onboarding_step2'),
-    path('onboarding/step3/', onboarding_step3, name='onboarding_step3'),
-    path('onboarding/complete/', onboarding_complete, name='onboarding_complete'),
+    path('app/', include('projectapp.urls')),
 ]

@@ -60,3 +60,20 @@ class BudgetReview(models.Model):
     irregular_expenses_handling = models.CharField(max_length=100)
     challenges = models.CharField(max_length=100)
     cash_tracking = models.CharField(max_length=100)
+
+
+
+class Choices(models.Model):
+    choice_text = models.CharField(max_length=100)
+
+class Question(models.Model):
+    question_text = models.CharField(max_length=200)
+    ans = models.ManyToManyField(
+        Choices,
+    )
+
+
+class UserResponse(models.Model):
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    response = models.ForeignKey(Choices, on_delete=models.CASCADE)

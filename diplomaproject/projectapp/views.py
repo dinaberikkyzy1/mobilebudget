@@ -14,9 +14,14 @@ from django.http import HttpResponse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import Choices, Question, UserResponse
+from .serializers import QuestionSerializer, UserResponseSerializer
 import tabulate
 import os
 import json
+import re
 
 from .forms import IncomeForm, ReviewForm, SpendingForm
 
@@ -148,7 +153,7 @@ def onboarding_step1(request):
             return redirect('onboarding_step2')
     else:
         form = IncomeForm()
-    return render(request, 'onboarding_step1.html', {'form': form})
+    return render(request, 'projectapp/onboarding_step1.html', {'step': 1, 'form': form})
 
 def onboarding_step2(request):
     if request.method == 'POST':
@@ -160,7 +165,7 @@ def onboarding_step2(request):
             return redirect('onboarding_step3')
     else:
         form = SpendingForm()
-    return render(request, 'onboarding_step2.html', {'form': form})
+    return render(request, 'projectapp/onboarding_step1.html', {'step': 2, 'form': form})
 
 def onboarding_step3(request):
     if request.method == 'POST':
@@ -172,7 +177,7 @@ def onboarding_step3(request):
             return redirect('onboarding_complete')
     else:
         form = ReviewForm()
-    return render(request, 'onboarding_step3.html', {'form': form})
+    return render(request, 'projectapp/onboarding_step1.html', {'step': 3, 'form': form})
 
 def onboarding_complete(request):
     return render(request, 'onboarding_complete.html')
@@ -252,3 +257,62 @@ def export_to_pdf(request):
         return HttpResponse(f"PDF saved to {pdf_file_path}")
     else:
         return HttpResponse("Method not allowed", status=405)
+    
+
+class QuestionView(APIView):
+    def get(self, request):
+        questions = Question.objects.all()
+        serializer = QuestionSerializer(questions, many=True)
+            
+        return Response(serializer.data)
+
+class UserResponseView(APIView):
+    def post(self, request):
+        serializer = UserResponseSerializer(data=request.data, many=True)
+        if serializer.is_valid():
+            serializer.save()
+            result = responseAnalyse(serializer.data)
+            return Response(result, status=201)
+        return Response(serializer.errors, status=400)
+    
+def responseAnalyse(data: list):
+    response = []
+    result ='Groceries: {} tenge\n'\
+            'Rent/Mortgage: {} tenge\n'\
+            'Utilities: {} tenge\n'\
+            'Transportation: {} tenge\n'\
+            'Dining out: {} tenge\n'\
+            'Entertainment: {} tenge\n'\
+            'Clothing: {} tenge\n'\
+            'Health/Insurance: {} tenge\n'\
+            'Other Categories: {} tenge\n'
+    resulting = ''
+    for i in data:
+        i['question'] = Question.objects.get(id=i['question']).question_text
+        i['response'] = Choices.objects.get(id=i['response']).choice_text
+    
+    for i in data:
+        if i['question'] == 'What is your monthly income?':
+            for j in re.findall(r'\d+', i['response']):
+                response.append(int(j))
+
+    if 150000 in response and len(response) == 1:
+        r = ('20,000', '40,000', '15,000', '10,000', '10,000', '5,000', '5,000', '5,000', '5,000')
+        result = result.format(*r)
+    elif (150000 in response and 200000 in response) and len(response) == 2:
+        r = ('25,000', '70,000', '20,000', '15,000', '15,000', '7,000', '10,000', '7,000', '7,000')
+        result = result.format(*r)
+    elif (250000 in response and 350000 in response) and len(response) == 2:
+        r = ['30,000', '90,000', '25,000', '20,000', '20,000', '10,000', '10,000', '10,000', '10,000']
+        result = result.format(*r)
+    elif (350000 in response and 450000 in response) and len(response) == 2:
+        r = ['35,000', '130,000', '30,000', '25,000', '25,000', '12,000', '12,000', '12,000', '12,000']
+        result = result.format(*r)
+    elif (450000 in response and 550000 in response) and len(response) == 2:
+        r = ['40,000', '180,000', '35,000', '30,000', '30,000', '15,000', '15,000', '15,000', '15,000']
+        result = result.format(*r)
+    elif 550000 in response and len(response) == 1:
+        r = ['50,000', '250,000', '40,000', '35,000', '35,000', '70,000', '25,000', '25,000', '25,000']
+        result = result.format(*r)
+    print(result)
+    return result
